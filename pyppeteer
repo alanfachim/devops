@@ -1,0 +1,83 @@
+import json
+import re
+import asyncio
+import subprocess
+from pyppeteer import launch
+import zipfile 
+import os 
+import boto3
+
+
+ 
+def montaHTML( data):
+    html = ''
+    estaAprovado = f"""<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-check2-circle" viewBox="0 0 16 16">
+                    <path d="M2.5 8a5.5 5.5 0 0 1 8.25-4.764.5.5 0 0 0 .5-.866A6.5 6.5 0 1 0 14.5 8a.5.5 0 0 0-1 0 5.5 5.5 0 1 1-11 0z"/>
+                    <path d="M15.354 3.354a.5.5 0 0 0-.708-.708L8 9.293 5.354 6.646a.5.5 0 1 0-.708.708l3 3a.5.5 0 0 0 .708 0l7-7z"/>
+                    </svg >"""
+
+    for dataNivel in data:
+        aprovadores = ""
+        for dataAprovador in dataNivel['aprovadores']:
+            aprovadores = aprovadores + f"""
+            <div style=" align - items: center; display: flex; ">
+                <div>
+                <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" fill="currentColor" class="bi bi-person-fill" viewBox="0 0 16 16" style="
+                    padding: 10px; fill: white; background-color: lightgray; border-radius: 50%; margin-left: 20px; margin-right: 20px;">
+                    <path d="M3 14s-1 0-1-1 1-4 6-4 6 3 6 4-1 1-1 1H3Zm5-6a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"></path>
+                </svg>
+                </div>
+                <div style="min-width: 400px;border-bottom: 1px solid lightgray;">
+                <div style="font-weight: bold;font-family: system-ui;">
+                    {dataAprovador['nome']}
+                </div>
+                <div style="color: gray;font-family: system-ui;font-size: small;padding-bottom: 4px;">
+                    {dataAprovador['cargo']}
+                </div>
+                </div>
+            </div> """
+        html += f"""<div style = " align-items: center; display: flex;" >
+                <div style = "writing-mode: vertical-rl;text-orientation: mixed;font-family: system-ui;background-color: #6b3bb1;color: white;width: 40px;text-align: center;height: {50 * len(dataNivel['aprovadores'])}px;line-height: 40px;border-radius: 20px;" >{dataNivel['nivel']} </div>
+                <div>${aprovadores} </div>
+                </div>"""
+    return html
+
+async def generic_event_test_service():
+    try:
+        
+        data = [{"aprovadores": [{"nome": "Alan Fachim", "cargo": "Engenheiro Sr"}, {
+            "nome": "Alan Fachim", "cargo": "Engenheiro Sr"}], "nivel": "N1"}]
+        await page.setContent(montaHTML(data))
+        a = await page.screenshot({"omitBackground": True, "encoding": "base64"})  
+        object = boto3.resource('s3').Object(
+            bucket_name='fachim-test', 
+            key='file_resource.txt'
+        ) 
+        object.put(Body='data:image/png;base64,'+a+'fim')   
+    except Exception as e:
+        print('err')
+        print(e)
+        return "Erro executando generic_event_test_service"
+
+async def init(): 
+    browser = await launch(args=[
+                                "--no-sandbox",
+                                "--single-process",
+                                "--disable-dev-shm-usage",
+                                "--disable-gpu",
+                                "--no-zygote",
+                            ],
+                            executablePath="/opt/chrome-linux/chrome",
+                            userDataDir="/opt/chrome-linux",)
+    page = await browser.newPage()
+    return page
+ 
+
+page =asyncio.get_event_loop().run_until_complete(init())
+
+def lambda_handler(event, context):
+    asyncio.get_event_loop().run_until_complete(generic_event_test_service())
+    return {
+        'statusCode': 200,
+        'body': json.dumps('Hello from Lambda!')
+    }
